@@ -189,14 +189,16 @@ public class ResumeController {
         String extension = "";
         int lastDotIndex = originalFilename.lastIndexOf(".");
         if (lastDotIndex > 0) {
-            extension = originalFilename.substring(lastDotIndex);
+            extension = originalFilename.substring(lastDotIndex).toLowerCase();
         }
         
         // 验证文件类型（允许PDF和Word文档）
         String contentType = file.getContentType();
-        if (contentType != null && !contentType.equals("application/pdf") 
-            && !contentType.equals("application/msword")
-            && !contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
+        boolean isAllowedContentType = "application/pdf".equals(contentType)
+            || "application/msword".equals(contentType)
+            || "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(contentType);
+        boolean isAllowedExtension = ".pdf".equals(extension) || ".doc".equals(extension) || ".docx".equals(extension);
+        if (!isAllowedContentType && !isAllowedExtension) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "仅支持PDF和Word文档格式");
         }
         
