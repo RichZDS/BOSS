@@ -57,14 +57,35 @@ public class BossApplicationDecisionServiceImpl extends ServiceImpl<BossApplicat
         
         User loginUser = userService.getLoginUser(request);
         
-        BossApplicationDecision e = new BossApplicationDecision();
-        BeanUtil.copyProperties(addRequest, e);
-        e.setBossId(loginUser.getId());
-        e.setDecidedAt(new Date()); // 设置决策时间
+        // 检查是否已存在决策记录，如果有则更新，否则插入新记录
+        QueryWrapper<BossApplicationDecision> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("application_id", addRequest.getApplicationId());
+        BossApplicationDecision existingDecision = this.getOne(queryWrapper);
         
-        boolean res = this.save(e);
-        if (!res) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR);
+        BossApplicationDecision e;
+        boolean isNew = true;
+        
+        if (existingDecision != null) {
+            // 更新现有记录
+            e = existingDecision;
+            isNew = false;
+            BeanUtil.copyProperties(addRequest, e);
+            e.setBossId(loginUser.getId());
+            e.setDecidedAt(new Date()); // 更新决策时间
+            boolean res = this.updateById(e);
+            if (!res) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR);
+            }
+        } else {
+            // 插入新记录
+            e = new BossApplicationDecision();
+            BeanUtil.copyProperties(addRequest, e);
+            e.setBossId(loginUser.getId());
+            e.setDecidedAt(new Date()); // 设置决策时间
+            boolean res = this.save(e);
+            if (!res) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR);
+            }
         }
         
         // 更新申请状态
@@ -72,7 +93,7 @@ public class BossApplicationDecisionServiceImpl extends ServiceImpl<BossApplicat
             applicationService.updateApplicationStatus(addRequest.getApplicationId(), addRequest.getDecision());
         } catch (Exception ex) {
             log.error("更新申请状态失败", ex);
-            // 不抛出异常，因为决策已经创建成功
+            // 不抛出异常，因为决策已经处理成功
         }
         
         return e.getId();
