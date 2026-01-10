@@ -13,10 +13,8 @@
           :model="formState"
           @finish="handleSubmit"
         >
-          <a-tabs v-model:activeKey="type" size="large" :tabBarStyle="{ textAlign: 'center' }">
+          <a-tabs v-model:activeKey="type" size="large" centered :tabBarStyle="{ textAlign: 'center' }">
             <a-tab-pane key="user" tab="用户登录" />
-            <a-tab-pane key="boss" tab="Boss登录" />
-            <a-tab-pane key="admin" tab="管理员登录" />
           </a-tabs>
 
           <div v-if="type === 'user' || type === 'boss' || type === 'admin'">
