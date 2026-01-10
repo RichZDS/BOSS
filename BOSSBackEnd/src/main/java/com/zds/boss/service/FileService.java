@@ -28,6 +28,12 @@ public class FileService {
     private String basePath;
 
     /**
+     * 文件存储路径（相对于项目根目录）
+     */
+    @Value("${file.storage.path:src/main/resources/static}")
+    private String storagePath;
+
+    /**
      * 文件访问基础URL（用于构建访问地址）
      */
     @Value("${server.port:8081}")
@@ -44,36 +50,38 @@ public class FileService {
      */
     @PostConstruct
     public void init() {
-        try {
-            // 获取src/main/resources/static目录的绝对路径
-            Resource resource = resourceLoader.getResource("classpath:/static/");
-            File staticDir;
-            
-            try {
-                // 尝试获取资源文件的实际路径
-                staticDir = resource.getFile();
-            } catch (IOException e) {
-                // 如果在jar包中运行，无法直接获取File，则使用项目根目录下的路径
-                String projectRoot = System.getProperty("user.dir");
-                staticDir = new File(projectRoot, "src/main/resources/static");
-                
-                // 如果项目根目录下不存在，尝试使用target/classes/static
-                if (!staticDir.exists()) {
-                    staticDir = new File(projectRoot, "target/classes/static");
-                }
-            }
-            
-            this.basePath = staticDir.getAbsolutePath();
-            
-            // 确保目录存在
-            initStorageDirectory();
-        } catch (Exception e) {
-            log.error("初始化文件存储目录失败", e);
-            // 降级方案：使用项目根目录下的static目录
-            String projectRoot = System.getProperty("user.dir");
-            this.basePath = new File(projectRoot, "src/main/resources/static").getAbsolutePath();
-            initStorageDirectory();
+        this.basePath = resolveBasePath();
+        initStorageDirectory();
+        log.info("文件存储路径已初始化: {}", basePath);
+    }
+
+    private String resolveBasePath() {
+        String projectRoot = System.getProperty("user.dir");
+        Path configuredPath = Paths.get(storagePath);
+        Path resolvedPath = configuredPath.isAbsolute()
+            ? configuredPath
+            : Paths.get(projectRoot).resolve(configuredPath);
+
+        if (Files.exists(resolvedPath)) {
+            return resolvedPath.toAbsolutePath().toString();
         }
+
+        try {
+            Resource resource = resourceLoader.getResource("classpath:/static/");
+            File staticDir = resource.getFile();
+            if (staticDir.exists()) {
+                return staticDir.getAbsolutePath();
+            }
+        } catch (IOException e) {
+            log.warn("无法从classpath解析静态目录，尝试降级路径: {}", e.getMessage());
+        }
+
+        Path targetPath = Paths.get(projectRoot, "target/classes/static");
+        if (Files.exists(targetPath)) {
+            return targetPath.toAbsolutePath().toString();
+        }
+
+        return resolvedPath.toAbsolutePath().toString();
     }
 
     /**
@@ -216,4 +224,3 @@ public class FileService {
         return filePath.toAbsolutePath().toString();
     }
 }
-
