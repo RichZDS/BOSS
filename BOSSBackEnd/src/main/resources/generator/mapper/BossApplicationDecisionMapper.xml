@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zds.boss.mapper.BossApplicationDecisionMapper">
+    <resultMap id="BaseResultMap" type="com.zds.boss.model.entity.BossApplicationDecision">
+        <id property="id" column="id"/>
+        <result property="applicationId" column="application_id"/>
+        <result property="bossId" column="boss_id"/>
+        <result property="decision" column="decision"/>
+        <result property="stage" column="stage"/>
+        <result property="note" column="note"/>
+        <result property="decidedAt" column="decided_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id,application_id,boss_id,decision,stage,note,decided_at,updated_at
+    </sql>
+    </mapper>
+
