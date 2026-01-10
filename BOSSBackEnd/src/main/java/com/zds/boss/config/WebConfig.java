@@ -32,25 +32,28 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @PostConstruct
     public void init() {
+        String projectRoot = System.getProperty("user.dir");
+        File configuredDir = new File(fileStoragePath);
+        if (!configuredDir.isAbsolute()) {
+            configuredDir = new File(projectRoot, fileStoragePath);
+        }
+
+        if (configuredDir.exists()) {
+            staticResourcePath = configuredDir.getAbsolutePath();
+            return;
+        }
+
         try {
-            // 尝试获取classpath下的static目录
             Resource resource = resourceLoader.getResource("classpath:/static/");
-            try {
-                File staticDir = resource.getFile();
-                staticResourcePath = staticDir.getAbsolutePath();
-            } catch (IOException e) {
-                // 如果在jar包中，使用项目根目录
-                String projectRoot = System.getProperty("user.dir");
-                File staticDir = new File(projectRoot, "src/main/resources/static");
-                if (!staticDir.exists()) {
-                    staticDir = new File(projectRoot, "target/classes/static");
-                }
-                staticResourcePath = staticDir.getAbsolutePath();
+            File staticDir = resource.getFile();
+            staticResourcePath = staticDir.getAbsolutePath();
+        } catch (IOException e) {
+            File targetStaticDir = new File(projectRoot, "target/classes/static");
+            if (targetStaticDir.exists()) {
+                staticResourcePath = targetStaticDir.getAbsolutePath();
+            } else {
+                staticResourcePath = new File(projectRoot, "src/main/resources/static").getAbsolutePath();
             }
-        } catch (Exception e) {
-            // 降级方案：使用项目根目录
-            String projectRoot = System.getProperty("user.dir");
-            staticResourcePath = new File(projectRoot, "src/main/resources/static").getAbsolutePath();
         }
     }
 
@@ -78,4 +81,3 @@ public class WebConfig implements WebMvcConfigurer {
                 .setCachePeriod(3600);
     }
 }
-

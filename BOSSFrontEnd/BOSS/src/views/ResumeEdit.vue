@@ -40,6 +40,12 @@
             </a-upload>
             <div v-if="uploading" style="color: #1890ff">
               <a-spin size="small" /> 上传中...
+              <a-progress
+                v-if="uploadProgress > 0"
+                :percent="uploadProgress"
+                size="small"
+                style="margin-top: 8px"
+              />
             </div>
             <div v-if="formState.attachmentUrl" style="margin-top: 8px">
               <a-space>
@@ -47,7 +53,8 @@
                   <FileTextOutlined />
                   查看附件
                 </a>
-                <a @click="formState.attachmentUrl = ''" style="color: #ff4d4f">删除</a>
+                <span style="color: #999">{{ uploadFileName }}</span>
+                <a @click="clearAttachment" style="color: #ff4d4f">删除</a>
               </a-space>
             </div>
             <div v-if="!formState.attachmentUrl && !uploading" style="color: #999; font-size: 12px">
@@ -73,7 +80,7 @@
 import NavBar from '@/components/NavBar.vue';
 import { reactive, ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { addResume, updateResume, getResumeVoById, uploadResumeFile } from '@/api/api/resumeController';
+import { addResume, updateResume, getResumeVoById } from '@/api/api/resumeController';
 import { message, Upload } from 'ant-design-vue';
 import { UploadOutlined, FileTextOutlined } from '@ant-design/icons-vue';
 
@@ -83,6 +90,8 @@ const router = useRouter();
 const isEdit = computed(() => !!route.params.id);
 const loading = ref(false);
 const uploading = ref(false);
+const uploadProgress = ref(0);
+const uploadFileName = ref('');
 
 const formState = reactive({
   resumeTitle: '',
@@ -106,6 +115,7 @@ const loadData = async () => {
     const res = await getResumeVoById({ id });
     if (res.code === 0 && res.data) {
       Object.assign(formState, res.data);
+      uploadFileName.value = extractFileName(formState.attachmentUrl);
     } else {
       message.error(res.message || '加载简历失败');
     }
@@ -114,13 +124,21 @@ const loadData = async () => {
   }
 };
 
+const extractFileName = (url: string) => {
+  if (!url) return '';
+  const parts = url.split('/');
+  return parts[parts.length - 1] || '';
+};
+
 const beforeUpload = (file: File) => {
   const isPdf = file.type === 'application/pdf';
   const isWord = file.type === 'application/msword' || 
                  file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  const isAllowedExtension = extension === 'pdf' || extension === 'doc' || extension === 'docx';
   const isLt10M = file.size / 1024 / 1024 < 10;
   
-  if (!isPdf && !isWord) {
+  if (!isPdf && !isWord && !isAllowedExtension) {
     message.error('仅支持PDF和Word文档格式');
     return Upload.LIST_IGNORE;
   }
@@ -132,25 +150,60 @@ const beforeUpload = (file: File) => {
 };
 
 const handleUpload = async (options: any) => {
-  const { file } = options;
+  const { file, onError, onSuccess } = options;
   uploading.value = true;
+  uploadProgress.value = 0;
   try {
     const formData = new FormData();
     formData.append('file', file);
-    
-    const res = await uploadResumeFile(formData);
-    if (res.code === 0 && res.data) {
-      formState.attachmentUrl = res.data;
-      message.success('文件上传成功');
-    } else {
-      message.error(res.message || '文件上传失败');
-    }
+
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${baseUrl}/resume/upload`, true);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        uploadProgress.value = Math.round((event.loaded / event.total) * 100);
+      }
+    };
+    xhr.onload = () => {
+      try {
+        const response = JSON.parse(xhr.responseText);
+        if (response.code === 0 && response.data) {
+          formState.attachmentUrl = response.data;
+          uploadFileName.value = extractFileName(response.data);
+          message.success('文件上传成功');
+          onSuccess?.(response, file);
+        } else {
+          message.error(response.message || '文件上传失败');
+          onError?.(response);
+        }
+      } catch (e) {
+        message.error('文件上传失败');
+        onError?.(e);
+      } finally {
+        uploadProgress.value = 0;
+        uploading.value = false;
+      }
+    };
+    xhr.onerror = () => {
+      message.error('文件上传失败');
+      onError?.(new Error('Upload failed'));
+      uploadProgress.value = 0;
+      uploading.value = false;
+    };
+    xhr.send(formData);
   } catch (error: any) {
     console.error('上传失败:', error);
     message.error(error.message || '文件上传失败');
-  } finally {
+    uploadProgress.value = 0;
     uploading.value = false;
   }
+};
+
+const clearAttachment = () => {
+  formState.attachmentUrl = '';
+  uploadFileName.value = '';
 };
 
 const onFinish = async (values: any) => {
