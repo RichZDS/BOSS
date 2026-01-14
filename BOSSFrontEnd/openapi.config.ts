@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 // 生成 API 服务代码
 generateService({
   requestLibPath: "import request from '@/libs/request'",
-  schemaPath: 'http://localhost:8082/v3/api-docs',
+  schemaPath: 'http://localhost:8081/v3/api-docs',
   serversPath: join(__dirname, 'src/api'),
   mock: false,
 }).catch((error) => {

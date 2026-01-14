@@ -8,6 +8,7 @@ import java.util.Date;
 public class ApplicationVO implements Serializable {
     private Long id;
     private Long userId;
+    private String userName;
     private Long resumeId;
     private Long jobId;
     private Long bossId;

@@ -190,9 +190,8 @@ public class ApplicationServiceImpl extends ServiceImpl<ApplicationMapper, Appli
     public Page<ApplicationVO> listApplicationVOByPage(ApplicationQueryRequest query) {
         long current = query.getCurrent();
         long size = query.getPageSize();
-        Page<Application> page = this.page(new Page<>(current, size), getQueryWrapper(query));
-        Page<ApplicationVO> voPage = new Page<>(current, size, page.getTotal());
-        voPage.setRecords(getApplicationVOList(page.getRecords()));
+        Page<ApplicationVO> voPage = new Page<>(current, size);
+        this.baseMapper.selectApplicationVOByPage(voPage, query);
         return voPage;
     }
 }

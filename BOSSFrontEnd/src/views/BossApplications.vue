@@ -76,9 +76,9 @@ const columns = [
     key: 'jobId',
   },
   {
-    title: '申请人ID',
-    dataIndex: 'userId',
-    key: 'userId',
+    title: '申请人',
+    dataIndex: 'userName',
+    key: 'userName',
   },
   {
     title: '投递时间',

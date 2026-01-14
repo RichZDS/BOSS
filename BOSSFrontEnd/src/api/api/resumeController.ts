@@ -71,14 +71,14 @@ export async function updateResume(
   })
 }
 
-/** 上传简历附件文件 POST /resume/upload */
-export async function uploadResumeFile(
-  formData: FormData,
-  options?: { [key: string]: any }
-) {
+/** 此处后端没有提供注释 POST /resume/upload */
+export async function uploadFile(body: {}, options?: { [key: string]: any }) {
   return request<API.BaseResponseString>('/resume/upload', {
     method: 'POST',
-    data: formData,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
     ...(options || {}),
   })
 }

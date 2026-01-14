@@ -39,6 +39,7 @@ declare namespace API {
   type ApplicationVO = {
     id?: number
     userId?: number
+    userName?: string
     resumeId?: number
     jobId?: number
     bossId?: number
@@ -131,12 +132,6 @@ declare namespace API {
     message?: string
   }
 
-  type BaseResponseString = {
-    code?: number
-    data?: string
-    message?: string
-  }
-
   type BaseResponsePageApplicationVO = {
     code?: number
     data?: PageApplicationVO
@@ -182,6 +177,12 @@ declare namespace API {
   type BaseResponseResumeVO = {
     code?: number
     data?: ResumeVO
+    message?: string
+  }
+
+  type BaseResponseString = {
+    code?: number
+    data?: string
     message?: string
   }
 
@@ -671,6 +672,15 @@ declare namespace API {
   type UserLoginRequest = {
     usrAccount?: string
     userPassword?: string
+  }
+
+  type UserProfileUpdateRequest = {
+    id?: number
+    oldPassword?: string
+    userPassword?: string
+    email?: string
+    phone?: string
+    userProfile?: string
   }
 
   type UserQueryRequest = {

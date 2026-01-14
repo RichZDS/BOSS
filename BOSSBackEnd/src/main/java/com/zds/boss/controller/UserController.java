@@ -15,6 +15,7 @@ import com.zds.boss.exception.BusinessException;
 import com.zds.boss.exception.ErrorCode;
 import com.zds.boss.exception.ThrowUtils;
 import com.zds.boss.model.dto.user.UserLoginRequest;
+import com.zds.boss.model.dto.user.UserProfileUpdateRequest;
 import com.zds.boss.model.dto.user.UserQueryRequest;
 import com.zds.boss.model.dto.user.UserRegisterRequest;
 import com.zds.boss.model.dto.user.UserUpdateRequest;
@@ -152,6 +153,54 @@ public class UserController {
         User user = new User();
         BeanUtils.copyProperties(userUpdateRequest, user);
         boolean result = userService.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    @PostMapping("/update/profile")
+    public BaseResponse<Boolean> updateUserProfile(@RequestBody UserProfileUpdateRequest updateRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(updateRequest == null, ErrorCode.PARAMS_ERROR);
+
+        User loginUser = userService.getLoginUser(request);
+        boolean isAdmin = UserRoleEnum.ADMIN.getValue().equals(loginUser.getUserRole());
+
+        Long targetUserId = loginUser.getId();
+        if (isAdmin && updateRequest.getId() != null && updateRequest.getId() > 0) {
+            targetUserId = updateRequest.getId();
+        }
+
+        User targetUser = userService.getById(targetUserId);
+        ThrowUtils.throwIf(targetUser == null, ErrorCode.NOT_FOUND_ERROR);
+
+        User userToUpdate = new User();
+        userToUpdate.setId(targetUserId);
+
+        if (updateRequest.getPhone() != null) {
+            userToUpdate.setPhone(updateRequest.getPhone());
+        }
+        if (updateRequest.getEmail() != null) {
+            userToUpdate.setEmail(updateRequest.getEmail());
+        }
+        if (updateRequest.getUserProfile() != null) {
+            userToUpdate.setUserProfile(updateRequest.getUserProfile());
+        }
+
+        if (updateRequest.getUserPassword() != null) {
+            String newPassword = updateRequest.getUserPassword();
+            if (newPassword.length() < 8 || newPassword.length() > 15) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码长度应为 8-15 位");
+            }
+            if (!isAdmin) {
+                ThrowUtils.throwIf(updateRequest.getOldPassword() == null, ErrorCode.PARAMS_ERROR, "旧密码不能为空");
+                String oldPasswordEncrypt = userService.getEncryptPassword(updateRequest.getOldPassword());
+                if (!oldPasswordEncrypt.equals(targetUser.getUserPassword())) {
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, "旧密码错误");
+                }
+            }
+            userToUpdate.setUserPassword(userService.getEncryptPassword(newPassword));
+        }
+
+        boolean result = userService.updateById(userToUpdate);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }

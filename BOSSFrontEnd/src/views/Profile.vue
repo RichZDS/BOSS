@@ -10,9 +10,6 @@
             :label-col="{ span: 4 }"
             :wrapper-col="{ span: 12 }"
           >
-            <a-form-item label="ID">
-              <a-input v-model:value="formState.id" disabled />
-            </a-form-item>
 
             <a-form-item label="用户名/账号">
               <a-input v-model:value="formState.username" disabled />
@@ -27,11 +24,11 @@
             </a-form-item>
 
             <a-form-item label="电话">
-              <a-input v-model:value="formState.phone" disabled placeholder="暂不支持修改" />
+              <a-input v-model:value="formState.phone"  placeholder="156xxxx" />
             </a-form-item>
 
             <a-form-item label="邮箱">
-              <a-input v-model:value="formState.email" disabled placeholder="暂不支持修改" />
+              <a-input v-model:value="formState.email" placeholder="xxx@cc.com" />
             </a-form-item>
 
             <a-form-item :wrapper-col="{ offset: 4, span: 12 }">
