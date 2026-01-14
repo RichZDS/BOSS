@@ -69,6 +69,37 @@
           <a-switch v-model:checked="isDefaultChecked" />
         </a-form-item>
 
+        <!-- AI优化区域 -->
+        <a-form-item label="AI优化" :wrapper-col="{ span: 16 }">
+          <a-space direction="vertical" style="width: 100%">
+            <a-button
+              type="default"
+              :loading="aiOptimizing"
+              @click="handleAiOptimize"
+              :disabled="aiOptimizing"
+              class="ai-optimize-btn"
+            >
+              <template #icon>
+                <RobotOutlined />
+              </template>
+              {{ aiOptimizing ? 'AI优化中...' : 'DeepSeek AI 智能优化' }}
+            </a-button>
+            <a-progress
+              v-if="aiOptimizing"
+              :percent="Math.round(aiProgress)"
+              :status="aiProgress >= 100 ? 'success' : 'active'"
+              :stroke-color="{
+                '0%': '#108ee9',
+                '100%': '#87d068',
+              }"
+              size="small"
+            />
+            <div v-if="!aiOptimizing" style="color: #999; font-size: 12px">
+              使用 DeepSeek AI 智能优化您的简历内容，让简历更专业、更有吸引力
+            </div>
+          </a-space>
+        </a-form-item>
+
         <a-form-item :wrapper-col="{ offset: 4, span: 16 }">
           <a-button type="primary" html-type="submit" :loading="loading">保存</a-button>
           <a-button style="margin-left: 10px" @click="router.back()">取消</a-button>
@@ -82,9 +113,9 @@
 import NavBar from '@/components/NavBar.vue';
 import { reactive, ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { addResume, updateResume, getResumeVoById, deleteResumeFile } from '@/api/api/resumeController';
+import { addResume, updateResume, getResumeVoById, deleteResumeFile, aiOptimizeResume } from '@/api/api/resumeController';
 import { message, Upload } from 'ant-design-vue';
-import { UploadOutlined, FilePdfOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined, FilePdfOutlined, RobotOutlined } from '@ant-design/icons-vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -94,6 +125,11 @@ const loading = ref(false);
 const uploading = ref(false);
 const uploadProgress = ref(0);
 const uploadFileName = ref('');
+
+// AI优化相关状态
+const aiOptimizing = ref(false);
+const aiProgress = ref(0);
+let aiProgressTimer: ReturnType<typeof setInterval> | null = null;
 
 const formState = reactive({
   resumeTitle: '',
@@ -229,6 +265,86 @@ const clearAttachment = async () => {
   uploadFileName.value = '';
 };
 
+// 开始伪进度条
+const startFakeProgress = () => {
+  aiProgress.value = 0;
+  aiProgressTimer = setInterval(() => {
+    // 伪进度条逻辑：快速增长到30%，然后慢慢增长到90%
+    if (aiProgress.value < 30) {
+      aiProgress.value += Math.random() * 8 + 2; // 2-10%
+    } else if (aiProgress.value < 60) {
+      aiProgress.value += Math.random() * 4 + 1; // 1-5%
+    } else if (aiProgress.value < 90) {
+      aiProgress.value += Math.random() * 2 + 0.5; // 0.5-2.5%
+    }
+    // 最多到90%，等待AI返回后才变成100%
+    if (aiProgress.value > 90) {
+      aiProgress.value = 90;
+    }
+  }, 300);
+};
+
+// 停止伪进度条
+const stopFakeProgress = (success: boolean) => {
+  if (aiProgressTimer) {
+    clearInterval(aiProgressTimer);
+    aiProgressTimer = null;
+  }
+  if (success) {
+    aiProgress.value = 100;
+    // 100%后延迟重置
+    setTimeout(() => {
+      aiProgress.value = 0;
+      aiOptimizing.value = false;
+    }, 500);
+  } else {
+    aiProgress.value = 0;
+    aiOptimizing.value = false;
+  }
+};
+
+// AI优化简历
+const handleAiOptimize = async () => {
+  // 检查是否有内容可优化
+  if (!formState.resumeTitle?.trim() && !formState.summary?.trim() && !formState.content?.trim()) {
+    message.warning('请至少填写一项内容后再进行AI优化');
+    return;
+  }
+
+  aiOptimizing.value = true;
+  startFakeProgress();
+
+  try {
+    const res = await aiOptimizeResume({
+      resumeTitle: formState.resumeTitle,
+      summary: formState.summary,
+      content: formState.content,
+    });
+
+    if (res.code === 0 && res.data) {
+      // 填充AI优化后的内容
+      if (res.data.resumeTitle) {
+        formState.resumeTitle = res.data.resumeTitle;
+      }
+      if (res.data.summary) {
+        formState.summary = res.data.summary;
+      }
+      if (res.data.content) {
+        formState.content = res.data.content;
+      }
+      stopFakeProgress(true);
+      message.success('AI优化完成！');
+    } else {
+      stopFakeProgress(false);
+      message.error(res.message || 'AI优化失败');
+    }
+  } catch (error: any) {
+    console.error('AI优化失败:', error);
+    stopFakeProgress(false);
+    message.error(error.message || 'AI优化失败，请稍后重试');
+  }
+};
+
 const onFinish = async (values: any) => {
   loading.value = true;
   try {
@@ -265,5 +381,26 @@ onMounted(() => {
   padding: 24px;
   background-color: #f0f2f5;
   min-height: calc(100vh - 64px);
+}
+
+.ai-optimize-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.ai-optimize-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  color: white;
+}
+
+.ai-optimize-btn:disabled {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  opacity: 0.7;
+  color: white;
 }
 </style>

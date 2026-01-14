@@ -8,12 +8,15 @@ import com.zds.boss.exception.BusinessException;
 import com.zds.boss.exception.ErrorCode;
 import com.zds.boss.exception.ThrowUtils;
 import com.zds.boss.model.dto.resume.ResumeAddRequest;
+import com.zds.boss.model.dto.resume.ResumeAiOptimizeRequest;
 import com.zds.boss.model.dto.resume.ResumeQueryRequest;
 import com.zds.boss.model.dto.resume.ResumeUpdateRequest;
 import com.zds.boss.model.entity.Resume;
 import com.zds.boss.model.entity.User;
 import com.zds.boss.model.enums.UserRoleEnum;
+import com.zds.boss.model.vo.ResumeAiOptimizeVO;
 import com.zds.boss.model.vo.ResumeVO;
+import com.zds.boss.service.AiService;
 import com.zds.boss.service.CosService;
 import com.zds.boss.service.FileService;
 import com.zds.boss.service.ResumeAddressService;
@@ -50,6 +53,9 @@ public class ResumeController {
 
     @Resource
     private ResumeAddressService resumeAddressService;
+
+    @Resource
+    private AiService aiService;
 
     @Value("${file.max-size-mb:10}")
     private long maxSizeMb;
@@ -300,6 +306,39 @@ public class ResumeController {
         } else {
             log.warn("用户 {} 删除文件失败: {}", loginUser.getId(), fileUrl);
         }
+        
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * AI优化简历
+     *
+     * @param request     AI优化请求
+     * @param httpRequest HTTP请求
+     * @return 优化后的简历内容
+     */
+    @PostMapping("/ai/optimize")
+    public BaseResponse<ResumeAiOptimizeVO> aiOptimizeResume(
+            @RequestBody ResumeAiOptimizeRequest request,
+            HttpServletRequest httpRequest) {
+        if (request == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数不能为空");
+        }
+        
+        // 验证用户登录
+        userService.getLoginUser(httpRequest);
+        
+        // 检查是否有内容需要优化
+        boolean hasContent = (request.getResumeTitle() != null && !request.getResumeTitle().trim().isEmpty())
+                || (request.getSummary() != null && !request.getSummary().trim().isEmpty())
+                || (request.getContent() != null && !request.getContent().trim().isEmpty());
+        
+        if (!hasContent) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请至少填写一项内容后再进行AI优化");
+        }
+        
+        // 调用AI服务优化简历
+        ResumeAiOptimizeVO result = aiService.optimizeResume(request);
         
         return ResultUtils.success(result);
     }

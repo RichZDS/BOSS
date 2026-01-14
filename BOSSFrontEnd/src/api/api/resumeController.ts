@@ -96,3 +96,32 @@ export async function deleteResumeFile(
     ...(options || {}),
   })
 }
+
+/** AI优化简历请求 */
+export interface ResumeAiOptimizeRequest {
+  resumeTitle?: string
+  summary?: string
+  content?: string
+}
+
+/** AI优化简历响应 */
+export interface ResumeAiOptimizeVO {
+  resumeTitle?: string
+  summary?: string
+  content?: string
+}
+
+/** AI优化简历 POST /resume/ai/optimize */
+export async function aiOptimizeResume(
+  body: ResumeAiOptimizeRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponse<ResumeAiOptimizeVO>>('/resume/ai/optimize', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
