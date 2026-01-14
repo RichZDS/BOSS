@@ -35,26 +35,26 @@
       </a-table>
     </a-card>
 
-    <a-card title="我的简历PDF" :bordered="false" style="margin-top: 16px">
-      <div v-if="addressLoading">
-        <a-spin />
-      </div>
-      <div v-else>
-        <div v-if="myAddress?.address">
-          <a-space>
-            <a :href="myAddress.address" target="_blank">查看PDF</a>
-            <a-popconfirm title="确定删除该PDF吗？" @confirm="deleteAddress">
-              <a-button danger>删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </div>
-        <div v-else>
-          <a-upload :before-upload="beforeUpload" :show-upload-list="false" :custom-request="(opt:any)=>doUpload(opt.file)">
-            <a-button type="primary">上传PDF</a-button>
-          </a-upload>
-        </div>
-      </div>
-    </a-card>
+<!--    <a-card title="我的简历PDF" :bordered="false" style="margin-top: 16px">-->
+<!--      <div v-if="addressLoading">-->
+<!--        <a-spin />-->
+<!--      </div>-->
+<!--      <div v-else>-->
+<!--        <div v-if="myAddress?.address">-->
+<!--          <a-space>-->
+<!--            <a :href="myAddress.address" target="_blank">查看PDF</a>-->
+<!--            <a-popconfirm title="确定删除该PDF吗？" @confirm="deleteAddress">-->
+<!--              <a-button danger>删除</a-button>-->
+<!--            </a-popconfirm>-->
+<!--          </a-space>-->
+<!--        </div>-->
+<!--        <div v-else>-->
+<!--          <a-upload :before-upload="beforeUpload" :show-upload-list="false" :custom-request="(opt:any)=>doUpload(opt.file)">-->
+<!--            <a-button type="primary">上传PDF</a-button>-->
+<!--          </a-upload>-->
+<!--        </div>-->
+<!--      </div>-->
+<!--    </a-card>-->
   </div>
 </template>
 
@@ -62,7 +62,7 @@
 import NavBar from '@/components/NavBar.vue';
 import { ref, onMounted, reactive } from 'vue';
 import { listResumeVoByPage, deleteResume } from '@/api/api/resumeController';
-import { uploadResumePdf, getMyResumeAddress, deleteMyResumeAddress } from '@/api/api/resumeAddressController';
+import {  } from '@/api/api/resumeController';
 import { message } from 'ant-design-vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';

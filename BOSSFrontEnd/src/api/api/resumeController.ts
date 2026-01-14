@@ -71,7 +71,7 @@ export async function updateResume(
   })
 }
 
-/** 此处后端没有提供注释 POST /resume/upload */
+/** 上传简历PDF文件到腾讯云COS POST /resume/upload */
 export async function uploadFile(body: {}, options?: { [key: string]: any }) {
   return request<API.BaseResponseString>('/resume/upload', {
     method: 'POST',
@@ -79,6 +79,20 @@ export async function uploadFile(body: {}, options?: { [key: string]: any }) {
       'Content-Type': 'application/json',
     },
     data: body,
+    ...(options || {}),
+  })
+}
+
+/** 删除COS中的简历附件文件 POST /resume/delete-file */
+export async function deleteResumeFile(
+  params: { fileUrl: string; resumeId?: number },
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean>('/resume/delete-file', {
+    method: 'POST',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   })
 }
