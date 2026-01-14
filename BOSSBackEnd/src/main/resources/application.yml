@@ -71,3 +71,16 @@ file:
     path: src/main/resources/static
   # 最大文件大小（MB）
   max-size-mb: 10
+
+# 腾讯云COS配置
+cos:
+  # 密钥ID
+  secret-id:
+  # 密钥Key（生产环境请使用环境变量或配置中心）
+  secret-key:
+  # 地域
+  region: ap-shanghai
+  # 存储桶名称
+  bucket-name: bosss-1336488383
+  # 访问域名前缀
+  url-prefix: https://bosss-1336488383.cos.ap-shanghai.myqcloud.com

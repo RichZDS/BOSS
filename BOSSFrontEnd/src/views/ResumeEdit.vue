@@ -31,11 +31,11 @@
               :before-upload="beforeUpload"
               :show-upload-list="false"
               :custom-request="handleUpload"
-              accept=".pdf,.doc,.docx"
+              accept=".pdf"
             >
               <a-button type="primary">
                 <UploadOutlined />
-                上传简历附件（PDF/Word）
+                上传简历PDF
               </a-button>
             </a-upload>
             <div v-if="uploading" style="color: #1890ff">
@@ -50,15 +50,17 @@
             <div v-if="formState.attachmentUrl" style="margin-top: 8px">
               <a-space>
                 <a :href="formState.attachmentUrl" target="_blank" style="color: #1890ff">
-                  <FileTextOutlined />
-                  查看附件
+                  <FilePdfOutlined />
+                  查看PDF简历
                 </a>
                 <span style="color: #999">{{ uploadFileName }}</span>
-                <a @click="clearAttachment" style="color: #ff4d4f">删除</a>
+                <a-popconfirm title="确定要删除此PDF文件吗？" @confirm="clearAttachment">
+                  <a style="color: #ff4d4f">删除</a>
+                </a-popconfirm>
               </a-space>
             </div>
             <div v-if="!formState.attachmentUrl && !uploading" style="color: #999; font-size: 12px">
-              支持PDF和Word格式，最大10MB
+              仅支持PDF格式，最大10MB（文件将上传至腾讯云COS）
             </div>
           </a-space>
         </a-form-item>
@@ -80,9 +82,9 @@
 import NavBar from '@/components/NavBar.vue';
 import { reactive, ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { addResume, updateResume, getResumeVoById } from '@/api/api/resumeController';
+import { addResume, updateResume, getResumeVoById, deleteResumeFile } from '@/api/api/resumeController';
 import { message, Upload } from 'ant-design-vue';
-import { UploadOutlined, FileTextOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined, FilePdfOutlined } from '@ant-design/icons-vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -132,14 +134,12 @@ const extractFileName = (url: string) => {
 
 const beforeUpload = (file: File) => {
   const isPdf = file.type === 'application/pdf';
-  const isWord = file.type === 'application/msword' || 
-                 file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   const extension = file.name.split('.').pop()?.toLowerCase();
-  const isAllowedExtension = extension === 'pdf' || extension === 'doc' || extension === 'docx';
+  const isAllowedExtension = extension === 'pdf';
   const isLt10M = file.size / 1024 / 1024 < 10;
   
-  if (!isPdf && !isWord && !isAllowedExtension) {
-    message.error('仅支持PDF和Word文档格式');
+  if (!isPdf && !isAllowedExtension) {
+    message.error('仅支持PDF格式');
     return Upload.LIST_IGNORE;
   }
   if (!isLt10M) {
@@ -156,6 +156,11 @@ const handleUpload = async (options: any) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
+    
+    // 如果是编辑模式，传入resumeId以便同时更新resume的attachment_url
+    if (isEdit.value && route.params.id) {
+      formData.append('resumeId', String(route.params.id));
+    }
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
     const xhr = new XMLHttpRequest();
@@ -201,7 +206,25 @@ const handleUpload = async (options: any) => {
   }
 };
 
-const clearAttachment = () => {
+const clearAttachment = async () => {
+  if (formState.attachmentUrl) {
+    try {
+      // 调用后端接口删除COS中的文件，如果是编辑模式传入resumeId
+      const params: { fileUrl: string; resumeId?: number } = { fileUrl: formState.attachmentUrl };
+      if (isEdit.value && route.params.id) {
+        params.resumeId = Number(route.params.id);
+      }
+      const res = await deleteResumeFile(params);
+      if (res.code === 0) {
+        message.success('文件删除成功');
+      } else {
+        message.warning('文件删除可能失败，请手动确认');
+      }
+    } catch (error) {
+      console.error('删除文件失败:', error);
+      message.warning('文件删除失败');
+    }
+  }
   formState.attachmentUrl = '';
   uploadFileName.value = '';
 };

@@ -1,0 +1,58 @@
+package com.zds.boss.config;
+
+import com.qcloud.cos.COSClient;
+import com.qcloud.cos.ClientConfig;
+import com.qcloud.cos.auth.BasicCOSCredentials;
+import com.qcloud.cos.auth.COSCredentials;
+import com.qcloud.cos.region.Region;
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * 腾讯云COS配置类
+ */
+@Configuration
+@ConfigurationProperties(prefix = "cos")
+@Data
+public class CosConfig {
+
+    /**
+     * 密钥ID
+     */
+    private String secretId;
+
+    /**
+     * 密钥Key
+     */
+    private String secretKey;
+
+    /**
+     * 地域
+     */
+    private String region;
+
+    /**
+     * 存储桶名称
+     */
+    private String bucketName;
+
+    /**
+     * 访问域名前缀
+     */
+    private String urlPrefix;
+
+    /**
+     * 创建COS客户端Bean
+     */
+    @Bean
+    public COSClient cosClient() {
+        // 初始化用户身份信息
+        COSCredentials cred = new BasicCOSCredentials(secretId, secretKey);
+        // 设置bucket的区域
+        ClientConfig clientConfig = new ClientConfig(new Region(region));
+        // 生成cos客户端
+        return new COSClient(cred, clientConfig);
+    }
+}

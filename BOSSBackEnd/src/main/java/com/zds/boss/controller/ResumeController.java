@@ -14,7 +14,9 @@ import com.zds.boss.model.entity.Resume;
 import com.zds.boss.model.entity.User;
 import com.zds.boss.model.enums.UserRoleEnum;
 import com.zds.boss.model.vo.ResumeVO;
+import com.zds.boss.service.CosService;
 import com.zds.boss.service.FileService;
+import com.zds.boss.service.ResumeAddressService;
 import com.zds.boss.service.ResumeService;
 import com.zds.boss.service.UserService;
 import jakarta.annotation.Resource;
@@ -24,7 +26,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.UUID;
 
 /**
@@ -43,6 +44,12 @@ public class ResumeController {
 
     @Resource
     private FileService fileService;
+
+    @Resource
+    private CosService cosService;
+
+    @Resource
+    private ResumeAddressService resumeAddressService;
 
     @Value("${file.max-size-mb:10}")
     private long maxSizeMb;
@@ -158,14 +165,18 @@ public class ResumeController {
     }
 
     /**
-     * 上传简历附件文件
+     * 上传简历附件文件到腾讯云COS
      *
-     * @param file 文件
-     * @param request HTTP请求
+     * @param file     文件
+     * @param resumeId 简历ID（可选，如果传入则同时更新resume的attachment_url）
+     * @param request  HTTP请求
      * @return 文件访问URL
      */
     @PostMapping("/upload")
-    public BaseResponse<String> uploadFile(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+    public BaseResponse<String> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "resumeId", required = false) Long resumeId,
+            HttpServletRequest request) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件不能为空");
         }
@@ -192,36 +203,104 @@ public class ResumeController {
             extension = originalFilename.substring(lastDotIndex).toLowerCase();
         }
         
-        // 验证文件类型（允许PDF和Word文档）
+        // 验证文件类型（仅允许PDF）
         String contentType = file.getContentType();
-        boolean isAllowedContentType = "application/pdf".equals(contentType)
-            || "application/msword".equals(contentType)
-            || "application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(contentType);
-        boolean isAllowedExtension = ".pdf".equals(extension) || ".doc".equals(extension) || ".docx".equals(extension);
+        boolean isAllowedContentType = "application/pdf".equals(contentType);
+        boolean isAllowedExtension = ".pdf".equals(extension);
         if (!isAllowedContentType && !isAllowedExtension) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "仅支持PDF和Word文档格式");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "仅支持PDF格式");
         }
         
-        try {
-            // 生成唯一文件名：用户ID_时间戳_UUID.扩展名
-            String timestamp = String.valueOf(System.currentTimeMillis());
-            String uniqueFileName = String.format("%d_%s_%s%s", 
-                loginUser.getId(), timestamp, UUID.randomUUID().toString().replace("-", ""), extension);
-            
-            // 构建相对路径：resume/{userId}/{filename}
-            String relativePath = String.format("resume/%d/%s", loginUser.getId(), uniqueFileName);
-            
-            // 上传文件
-            fileService.upload(relativePath, file);
-            
-            // 构建文件访问URL
-            String fileUrl = fileService.buildUrl(relativePath);
-            
-            log.info("用户 {} 上传文件成功: {}, URL: {}", loginUser.getId(), originalFilename, fileUrl);
-            return ResultUtils.success(fileUrl);
-        } catch (IOException e) {
-            log.error("文件上传失败: {}", e.getMessage(), e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件上传失败: " + e.getMessage());
+        // 如果传入了resumeId，检查是否有权限操作该简历
+        if (resumeId != null && resumeId > 0) {
+            Resume resume = resumeService.getById(resumeId);
+            if (resume == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "简历不存在");
+            }
+            if (!resume.getUserId().equals(loginUser.getId())) {
+                throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权操作该简历");
+            }
         }
+        
+        // 生成随机文件Key（用于resume_address表）
+        String fileKey = UUID.randomUUID().toString().replace("-", "");
+        
+        // 生成唯一文件名：用户ID_时间戳_UUID
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String customFileName = String.format("%d_%s_%s", 
+            loginUser.getId(), timestamp, fileKey);
+        
+        // 构建存储目录：resume/{userId}
+        String directory = String.format("resume/%d", loginUser.getId());
+        
+        // 上传文件到腾讯云COS
+        String fileUrl = cosService.uploadFile(file, directory, customFileName);
+        
+        // 如果传入了resumeId，更新resume的attachment_url
+        if (resumeId != null && resumeId > 0) {
+            Resume resume = new Resume();
+            resume.setId(resumeId);
+            resume.setAttachmentUrl(fileUrl);
+            resumeService.updateById(resume);
+            log.info("已更新简历 {} 的附件URL", resumeId);
+        }
+        
+        // 保存或更新resume_address记录
+        resumeAddressService.saveOrUpdateByUserId(loginUser.getId(), resumeId, fileUrl, fileKey);
+        log.info("已保存简历地址记录，userId: {}, fileKey: {}", loginUser.getId(), fileKey);
+        
+        log.info("用户 {} 上传简历PDF成功: {}, URL: {}", loginUser.getId(), originalFilename, fileUrl);
+        return ResultUtils.success(fileUrl);
+    }
+
+    /**
+     * 删除COS中的简历附件文件
+     *
+     * @param fileUrl  文件URL
+     * @param resumeId 简历ID（可选，如果传入则同时清空resume的attachment_url）
+     * @param request  HTTP请求
+     * @return 是否删除成功
+     */
+    @PostMapping("/delete-file")
+    public BaseResponse<Boolean> deleteFile(
+            @RequestParam("fileUrl") String fileUrl,
+            @RequestParam(value = "resumeId", required = false) Long resumeId,
+            HttpServletRequest request) {
+        if (fileUrl == null || fileUrl.isEmpty()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件URL不能为空");
+        }
+        
+        User loginUser = userService.getLoginUser(request);
+        
+        // 验证URL是否属于当前用户（安全检查）
+        String userDirectory = String.format("resume/%d/", loginUser.getId());
+        if (!fileUrl.contains(userDirectory)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权删除该文件");
+        }
+        
+        // 删除COS中的文件
+        boolean result = cosService.deleteFile(fileUrl);
+        
+        if (result) {
+            log.info("用户 {} 删除文件成功: {}", loginUser.getId(), fileUrl);
+            
+            // 如果传入了resumeId，清空resume的attachment_url
+            if (resumeId != null && resumeId > 0) {
+                Resume resume = resumeService.getById(resumeId);
+                if (resume != null && resume.getUserId().equals(loginUser.getId())) {
+                    resume.setAttachmentUrl("");
+                    resumeService.updateById(resume);
+                    log.info("已清空简历 {} 的附件URL", resumeId);
+                }
+            }
+            
+            // 删除resume_address记录
+            resumeAddressService.deleteByUserId(loginUser.getId());
+            log.info("已删除用户 {} 的简历地址记录", loginUser.getId());
+        } else {
+            log.warn("用户 {} 删除文件失败: {}", loginUser.getId(), fileUrl);
+        }
+        
+        return ResultUtils.success(result);
     }
 }
